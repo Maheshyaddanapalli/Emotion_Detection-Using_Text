@@ -1,1 +1,513 @@
+from sklearn.svm import SVC
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import cross_val_score
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import CountVectorizer
+fromnltk.util import ngrams
+import matplotlib.pyplot as plt
+df=pd.read_csv('emotion_sentimen_dataset.csv')
+df1=pd.read_csv('eng_dataset.csv')
+df.isnull().sum()
+x=df.drop(columns=['Unnamed: 0','Emotion'])
+y=df['Emotion']
+label_counts = df['Emotion'].value_counts()
+plt.figure(figsize=(10, 6))
+label_counts.plot(kind='bar')
+plt.title('Label Frequency')
+plt.xlabel('Labels')
+plt.ylabel('Frequency')
+plt.xticks(rotation=45)
+plt.show()
+x1=df1['content']
+y1=df1['sentiment']
+label_counts = df1['sentiment'].value_counts()
+plt.figure(figsize=(10, 6))
+label_counts.plot(kind='bar')
+plt.title('Label Frequency')
+plt.xlabel('Labels')
+plt.ylabel('Frequency')
+plt.xticks(rotation=45)
+plt.show()
 
+x=np.append(x1.values,x.values)
+y=np.append(y1.values,y.values)
+
+x_isear=x1
+y_isear=y1
+
+for i in range(len(y)):
+    if y[i]=='joy':
+        y[i]='fun'
+len(y)
+
+df = pd.DataFrame({'text': x, 'label': y})
+label_counts = df['label'].value_counts()
+plt.figure(figsize=(10, 6))
+label_counts.plot(kind='bar')
+plt.title('Label Frequency')
+plt.xlabel('Labels')
+plt.ylabel('Frequency')
+plt.xticks(rotation=45)
+plt.show()
+
+df= pd.concat([
+    df[(df["label"] == "neutral")].head(2000),
+    df[(df["label"] == "love")].head(2000),
+    df[(df["label"] == "happiness")].head(2000),
+    df[(df["label"] == "sadness")].head(2000),
+    df[(df["label"] == "relief")].head(2000),
+    df[(df["label"] == "hate")].head(2000),
+    df[(df["label"] == "anger")].head(2000),
+    df[(df["label"] == "fun")].head(2000),
+    df[(df["label"] == "enthusiasm")].head(2000),
+    df[(df["label"] == "suprise")].head(2000),
+    df[(df["label"] == "empty")].head(2000),
+    df[(df["label"] == "worry")].head(2000),
+    df[(df["label"] == "fear")].head(2000)])
+df = df.sample(frac=1, random_state=42).reset_index(drop=True)
+df.head(20)
+
+label_counts = df['label'].value_counts()
+plt.figure(figsize=(10, 6))
+label_counts.plot(kind='bar')
+plt.title('Label Frequency')
+plt.xlabel('Labels')
+plt.ylabel('Frequency')
+plt.xticks(rotation=45)
+plt.show()
+
+le=LabelEncoder()
+target=le.fit_transform(y)
+len(np.array(df['label']))
+
+set(list(y))
+
+df.head()
+
+def preprocess_text(text):
+    # Convert to lowercase
+    text = text.lower()
+    # Remove URLs
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    # Remove HTML tags
+    text = re.sub(r'<.*?>', '', text)
+    # Remove email addresses
+    text = re.sub(r'\S+@\S+', '', text)
+    # Remove punctuation and special characters using regex
+    text = re.sub(r'[^\w\s]', '', text)
+    # Remove numbers
+    text = re.sub(r'\d+', '', text)
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    # Remove stop words
+    text = ' '.join([word for word in text.split() if word not in stop_words])
+    return text
+
+df['processed_text'] = df['text'].apply(preprocess_text)
+df.head()
+
+df['processed_text']
+
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from gensim.models import Word2Vec
+from scipy.sparse import hstack
+from sklearn.svm import SVC
+from sklearn.ensemble import RandomForestClassifier
+from scipy.sparse import hstack 
+
+# Tokenize sentences for Word2Vec
+sentences = [text.split() for text in df['processed_text']]
+
+# Train a Word2Vec model. You may adjust parameters as needed.
+w2v_model = Word2Vec(sentences, vector_size=100, window=5, min_count=1, workers=4)
+
+# TF-IDF with n-grams
+tfidf_vectorizer = TfidfVectorizer(ngram_range=(1, 3))
+X_tfidf = tfidf_vectorizer.fit_transform(df['processed_text'])
+
+# Bag of Words with n-grams
+count_vectorizer = CountVectorizer(ngram_range=(1, 3))
+X_bow = count_vectorizer.fit_transform(df['processed_text'])
+
+# Concatenate features
+X_combined = hstack([X_tfidf, X_bow])
+
+# Target variable
+y = df['label']
+le=LabelEncoder()
+y=le.fit_transform(y)
+
+
+svm_classifier = SVC(probability=True)
+svm_classifier.fit(X_train, y_train)
+svm_accuracy = svm_classifier.score(X_test, y_test)
+svm_accuracy
+
+from lime.lime_text import LimeTextExplainer
+proc=df['processed_text'].values
+def preprocess_and_predict(texts,model):
+    # Vectorize text
+    X_tfidf = tfidf_vectorizer.transform(texts)
+    X_bow = count_vectorizer.transform(texts)
+    # Concatenate features
+    X_combined = hstack([X_tfidf, X_bow])
+    
+    return svm_classifier.predict_proba(X_combined)
+
+# Using LIME to explain XGBoost predictions
+explainer = LimeTextExplainer(class_names=le.classes_)
+
+# Example text to explain
+text_to_explain = proc[7515]
+
+# Explain XGBoost prediction
+explanation = explainer.explain_instance(
+    text_to_explain, 
+    lambda x: preprocess_and_predict(x, svm_classifier), 
+    num_features=6
+)
+
+# Display the explanation
+explanation.show_in_notebook(text=True)
+
+# TfidfVectorizer
+df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
+import sklearn
+vectorizer = sklearn.feature_extraction.text.TfidfVectorizer(min_df=0.01,
+        ngram_range=(1,1),
+        use_idf=True,
+        smooth_idf=True,
+        sublinear_tf=True)
+
+train_vectors = vectorizer.fit_transform(df_train['processed_text'])
+test_vectors = vectorizer.transform(df_test['processed_text'])
+
+Y_train=df_train['label']
+Y_test=df_test['label']
+svm = SVC(random_state=42,
+        kernel='rbf',
+        gamma=1.0,
+        C=10.0,
+        class_weight='balanced',
+        max_iter = 10000,
+        probability=True)
+
+
+svm.fit(train_vectors, Y_train)
+import shap
+explainer = shap.KernelExplainer(svm.predict_proba, train_vectors[0:50])
+text_instance = ["I really like easy interface use product protection software."]
+# transform text using vectorizer
+instance_vectorized = vectorizer.transform(text_instance)
+instance_shap_values = explainer.shap_values(instance_vectorized)
+
+pp=np.transpose(instance_shap_values[0])[5]
+explainer.expected_value.shape
+
+vectorizer.get_feature_names_out().shape
+
+shap.initjs()
+shap.force_plot(explainer.expected_value[5], pp, vectorizer.get_feature_names_out())
+
+feature_names = vectorizer.get_feature_names_out()
+
+def get_full_length_words(tfidf_vector, feature_names):
+    # convert sparse tfidf_vector to dense
+    dense_vector = tfidf_vector.toarray().flatten()
+
+    # create a full-length word list
+    words = [feature if value != 0 else "" for feature, value in zip(feature_names, dense_vector)]
+    return words
+
+# Create full-length word lists for the first n test instances
+n = 50
+words_instances = [get_full_length_words(test_vectors[i], feature_names) for i in range(n)]
+
+# Visualize the SHAP values for each instance
+shap.initjs()
+for i in range(10):
+    display(shap.force_plot(explainer.expected_value[5], np.transpose(instance_shap_values[0])[i], words_instances[i]))
+
+
+instance_shap_values.shape
+
+instance_idx = 0   # index of the instance you want to visualize
+
+# Get the actual instance text (original input text)
+instance_text = df_test.iloc[instance_idx]['processed_text']
+
+# Get the predicted probability for each class
+predicted_probabilities = svm.predict_proba(test_vectors[instance_idx])
+
+# Get the predicted class index (highest probability)
+predicted_class_idx = np.argmax(predicted_probabilities)
+
+# Assuming your dataset has class labels, retrieve the name of the predicted class
+class_names = le.classes_  # Modify this based on your actual class labels
+predicted_class_name = class_names[predicted_class_idx]
+
+print(f"Instance Index: {instance_idx}")
+print(f"Predicted Class Index: {predicted_class_idx}")
+print(f"Predicted Class Name: {predicted_class_name}")
+print(f"Instance Text: {instance_text}")
+
+# Extract SHAP values for the chosen instance and the correct predicted class.
+shap_values_for_class = instance_shap_values[0][:, predicted_class_idx].reshape(1, -1)  # Ensure correct class selection
+
+# Get the corresponding feature vector for the same instance.
+features_instance = test_vectors.toarray()[instance_idx].reshape(1, -1)
+
+# Plot the summary for this single instance.
+shap.summary_plot(
+    shap_values_for_class,
+    features_instance,
+    feature_names=vectorizer.get_feature_names_out()
+)
+
+
+instance_idx = 2   # index of the instance you want to visualize
+
+# Get the actual instance text (original input text)
+instance_text = df_test.iloc[instance_idx]['processed_text']
+
+# Get the predicted probability for each class
+predicted_probabilities = svm.predict_proba(test_vectors[instance_idx])
+
+# Get the predicted class index (highest probability)
+predicted_class_idx = np.argmax(predicted_probabilities)
+
+# Assuming your dataset has class labels, retrieve the name of the predicted class
+class_names = le.classes_  # Modify this based on your actual class labels
+predicted_class_name = class_names[predicted_class_idx]
+
+print(f"Instance Index: {instance_idx}")
+print(f"Predicted Class Index: {predicted_class_idx}")
+print(f"Predicted Class Name: {predicted_class_name}")
+print(f"Instance Text: {instance_text}")
+
+# Extract SHAP values for the chosen instance and the correct predicted class.
+shap_values_for_class = instance_shap_values[0][:, predicted_class_idx].reshape(1, -1)  # Ensure correct class selection
+
+# Get the corresponding feature vector for the same instance.
+features_instance = test_vectors.toarray()[instance_idx].reshape(1, -1)
+
+# Plot the summary for this single instance.
+shap.summary_plot(
+    shap_values_for_class,
+    features_instance,
+    feature_names=vectorizer.get_feature_names_out()
+)
+
+
+instance_idx = 5   # index of the instance you want to visualize
+
+# Get the actual instance text (original input text)
+instance_text = df_test.iloc[instance_idx]['processed_text']
+
+# Get the predicted probability for each class
+predicted_probabilities = svm.predict_proba(test_vectors[instance_idx])
+
+# Get the predicted class index (highest probability)
+predicted_class_idx = np.argmax(predicted_probabilities)
+
+# Assuming your dataset has class labels, retrieve the name of the predicted class
+class_names = le.classes_  # Modify this based on your actual class labels
+predicted_class_name = class_names[predicted_class_idx]
+
+print(f"Instance Index: {instance_idx}")
+print(f"Predicted Class Index: {predicted_class_idx}")
+print(f"Predicted Class Name: {predicted_class_name}")
+print(f"Instance Text: {instance_text}")
+
+# Extract SHAP values for the chosen instance and the correct predicted class.
+shap_values_for_class = instance_shap_values[0][:, predicted_class_idx].reshape(1, -1)  # Ensure correct class selection
+
+# Get the corresponding feature vector for the same instance.
+features_instance = test_vectors.toarray()[instance_idx].reshape(1, -1)
+
+# Plot the summary for this single instance.
+shap.summary_plot(
+    shap_values_for_class,
+    features_instance,
+    feature_names=vectorizer.get_feature_names_out()
+)
+
+
+instance_idx = 7   # index of the instance you want to visualize
+
+# Get the actual instance text (original input text)
+instance_text = df_test.iloc[instance_idx]['processed_text']
+
+# Get the predicted probability for each class
+predicted_probabilities = svm.predict_proba(test_vectors[instance_idx])
+
+# Get the predicted class index (highest probability)
+predicted_class_idx = np.argmax(predicted_probabilities)
+
+# Assuming your dataset has class labels, retrieve the name of the predicted class
+class_names = le.classes_  # Modify this based on your actual class labels
+predicted_class_name = class_names[predicted_class_idx]
+
+print(f"Instance Index: {instance_idx}")
+print(f"Predicted Class Index: {predicted_class_idx}")
+print(f"Predicted Class Name: {predicted_class_name}")
+print(f"Instance Text: {instance_text}")
+
+# Extract SHAP values for the chosen instance and the correct predicted class.
+shap_values_for_class = instance_shap_values[0][:, predicted_class_idx].reshape(1, -1)  # Ensure correct class selection
+
+# Get the corresponding feature vector for the same instance.
+features_instance = test_vectors.toarray()[instance_idx].reshape(1, -1)
+
+# Plot the summary for this single instance.
+shap.summary_plot(
+    shap_values_for_class,
+    features_instance,
+    feature_names=vectorizer.get_feature_names_out()
+)
+
+
+instance_idx = 15   # index of the instance you want to visualize
+
+# Get the actual instance text (original input text)
+instance_text = df_test.iloc[instance_idx]['processed_text']
+
+# Get the predicted probability for each class
+predicted_probabilities = svm.predict_proba(test_vectors[instance_idx])
+
+# Get the predicted class index (highest probability)
+predicted_class_idx = np.argmax(predicted_probabilities)
+
+# Assuming your dataset has class labels, retrieve the name of the predicted class
+class_names = le.classes_  # Modify this based on your actual class labels
+predicted_class_name = class_names[predicted_class_idx]
+
+print(f"Instance Index: {instance_idx}")
+print(f"Predicted Class Index: {predicted_class_idx}")
+print(f"Predicted Class Name: {predicted_class_name}")
+print(f"Instance Text: {instance_text}")
+
+# Extract SHAP values for the chosen instance and the correct predicted class.
+shap_values_for_class = instance_shap_values[0][:, predicted_class_idx].reshape(1, -1)  # Ensure correct class selection
+
+# Get the corresponding feature vector for the same instance.
+features_instance = test_vectors.toarray()[instance_idx].reshape(1, -1)
+
+# Plot the summary for this single instance.
+shap.summary_plot(
+    shap_values_for_class,
+    features_instance,
+    feature_names=vectorizer.get_feature_names_out()
+)
+
+
+instance_idx = 21   # index of the instance you want to visualize
+
+# Get the actual instance text (original input text)
+instance_text = df_test.iloc[instance_idx]['processed_text']
+
+# Get the predicted probability for each class
+predicted_probabilities = svm.predict_proba(test_vectors[instance_idx])
+
+# Get the predicted class index (highest probability)
+predicted_class_idx = np.argmax(predicted_probabilities)
+
+# Assuming your dataset has class labels, retrieve the name of the predicted class
+class_names = le.classes_  # Modify this based on your actual class labels
+predicted_class_name = class_names[predicted_class_idx]
+
+print(f"Instance Index: {instance_idx}")
+print(f"Predicted Class Index: {predicted_class_idx}")
+print(f"Predicted Class Name: {predicted_class_name}")
+print(f"Instance Text: {instance_text}")
+
+# Extract SHAP values for the chosen instance and the correct predicted class.
+shap_values_for_class = instance_shap_values[0][:, predicted_class_idx].reshape(1, -1)  # Ensure correct class selection
+
+# Get the corresponding feature vector for the same instance.
+features_instance = test_vectors.toarray()[instance_idx].reshape(1, -1)
+
+# Plot the summary for this single instance.
+shap.summary_plot(
+    shap_values_for_class,
+    features_instance,
+    feature_names=vectorizer.get_feature_names_out()
+)
+
+
+ -------------------------
+# 2. Anchor Explanation Code
+# -------------------------
+import spacy
+nlp = spacy.load('en_core_web_sm')
+def predict_func(texts):
+    probabilities = preprocess_and_predict(texts, "model")  # Get probability distribution
+    predictions = np.argmax(probabilities, axis=1)  # Convert to class labels
+    return predictions  # Ensure a 1D NumPy array
+    
+# Ensure you have installed the Anchor package (pip install anchor-text)
+from anchor import anchor_text
+
+# Initialize the AnchorTextExplainer with your class names.
+explainer_anchor = anchor_text.AnchorText(nlp,class_names=le.classes_)#,use_unk_distribution=True)
+text_to_explain=proc[2003]
+
+# Explain the same instance.
+# The explain_instance function takes the text instance, your prediction function, and optional parameters.
+explanation_anchor = explainer_anchor.explain_instance(text_to_explain, predict_func, threshold=0.95)
+
+# Print the Anchor explanation details
+print("Anchor explanation for: ",text_to_explain)
+print("predicted value: ",explainer_anchor.class_names[predict_func([text_to_explain])[0]])
+print("Anchor (if any):", explanation_anchor.names())
+print("Precision:", explanation_anchor.precision())
+print("Coverage:", explanation_anchor.coverage())
+
+# To view the explanation in a more formatted way, you might also simply print the explanation object:
+print(explanation_anchor)
+
+# -------------------------
+# (Optional) Additional Explainability Method
+# -------------------------
+# If you want to experiment with another method (for example, integrated gradients), you could do so.
+# Note that many advanced methods are designed for deep models. However, you might try the SHAP GradientExplainer
+# if you replace the SVM with a differentiable model (such as a neural network). For your current SVM model,
+# KernelExplainer (used above for SHAP) is generally the most straightforward choice.
+
+
+pred = explainer_anchor.class_names[predict_func([text_to_explain])[0]]
+alternative =  explainer_anchor.class_names[1 - predict_func([text_to_explain])[0]]
+
+print('Examples where anchor applies and model predicts %s:' % pred)
+print()
+print('\n'.join([x[0] for x in explanation_anchor.examples(only_same_prediction=True)]))
+print()
+print('Examples where anchor applies and model predicts %s:' % alternative)
+print()
+print('\n'.join([x[0] for x in explanation_anchor.examples(partial_index=0, only_different_prediction=True)]))
+
+from xgboost import XGBClassifier
+import seaborn as sns
+my_model=XGBClassifier()
+my_model.fit(Xtrain,Ytrain, verbose=False)
+predictions = my_model.predict(Xtest)
+from sklearn.metrics import accuracy_score, confusion_matrix,classification_report
+print("ACCURACY SCORE IS : "+str(accuracy_score(Ytest,predictions)))
+conf_matrix = confusion_matrix(Ytest, predictions)
+class_report = classification_report(Ytest, predictions, target_names=[f"Class {i}" for i in range(12)])
+print("CLASSIFICATION REPORT:\n", class_report)
+plt.figure(figsize=(10, 8))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=[f"Class {i}" for i in range(12)], yticklabels=[f"Class {i}" for i in range(12)])
+plt.xlabel('Predicted')
+plt.ylabel('True')
+plt.title('Confusion Matrix')
+plt.show()
+
+
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X_combined, y, test_size=0.2, random_state=42)
+Xtrain, Xtest, Ytrain, Ytest = train_test_split(X_combined, y, test_size=0.2, random_state=42)
